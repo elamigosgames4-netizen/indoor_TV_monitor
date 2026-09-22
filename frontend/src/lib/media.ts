@@ -18,6 +18,11 @@ function getMediaDir(): Directory | null {
   if (!MEDIA_DIR) {
     MEDIA_DIR = new Directory(Paths.document, "indoor-media");
   }
+  try {
+    if (!MEDIA_DIR.exists) MEDIA_DIR.create({ intermediates: true });
+  } catch {
+    // already exists / race
+  }
   return MEDIA_DIR;
 }
 
@@ -25,6 +30,11 @@ function getTmpDir(): Directory | null {
   if (Platform.OS === "web") return null;
   if (!TMP_DIR) {
     TMP_DIR = new Directory(Paths.cache, "indoor-tmp");
+  }
+  try {
+    if (!TMP_DIR.exists) TMP_DIR.create({ intermediates: true });
+  } catch {
+    // already exists / race
   }
   return TMP_DIR;
 }
