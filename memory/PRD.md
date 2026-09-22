@@ -9,6 +9,10 @@ Criar do zero um aplicativo de mídia indoor para Android, inspirado no MK Indoo
 - **Banco:** MongoDB (cache de resolução; futuramente batimentos dos aparelhos na Etapa 2).
 - **Autostart nativo:** config plugin `plugins/withAutostart.js` (BootReceiver Kotlin + RECEIVE_BOOT_COMPLETED/WAKE_LOCK + LEANBACK_LAUNCHER; dispara deep link `indoorplayer://boot`).
 
+## Correções (22/09/2026)
+- **Tela preta no vídeo (Android):** `expo-video` usa `SurfaceView` por padrão, que não respeita o transform de rotação e renderiza preto dentro da view rotacionada. Corrigido com `surfaceType="textureView"` + `useExoShutter={false}` em `VideoItem.tsx`.
+- **Multi-TV com links diferentes:** cada aparelho guarda o próprio link/config localmente (AsyncStorage); basta instalar o APK em cada TV e configurar um link diferente por aparelho — já funciona por design.
+
 ## Tarefas concluídas (22/09/2026)
 - Validação prévia da integração Drive: listagem real sem API key (embeddedfolderview), download real (HTTP 200, vídeo 883MB com range 206), redirect tiny.cc 303, TextureView do expo-video (rotação viável). APK: build via Publish (EAS); compilação local indisponível no container — avisado ao usuário.
 - Backend: resolve de pasta (tiny.cc → Drive), filtro MP4/JPG/JPEG/PNG, ordenação natural, cache memória+Mongo, health check.

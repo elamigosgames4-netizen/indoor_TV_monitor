@@ -44,6 +44,8 @@ export function VideoItem({ uri, rotation, onDone }: Props) {
         player={player}
         contentFit="contain"
         nativeControls={false}
+        surfaceType="textureView"
+        useExoShutter={false}
         style={{ width: "100%", height: "100%" }}
         testID="player-video-view"
       />
