@@ -8,67 +8,50 @@ export function driveDownloadUrl(fileId: string): string {
   return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
 }
 
-// The new expo-file-system API has no web implementation (constructors throw),
-// so directories/files are only materialized on native platforms.
-let MEDIA_DIR: Directory | null = null;
-let TMP_DIR: Directory | null = null;
-
-function getMediaDir(): Directory | null {
-  if (Platform.OS === "web") return null;
-  if (!MEDIA_DIR) {
-    MEDIA_DIR = new Directory(Paths.document, "indoor-media");
-  }
-  try {
-    if (!MEDIA_DIR.exists) MEDIA_DIR.create({ intermediates: true });
-  } catch {
-    // already exists / race
-  }
-  return MEDIA_DIR;
-}
-
-function getTmpDir(): Directory | null {
-  if (Platform.OS === "web") return null;
-  if (!TMP_DIR) {
-    TMP_DIR = new Directory(Paths.cache, "indoor-tmp");
-  }
-  try {
-    if (!TMP_DIR.exists) TMP_DIR.create({ intermediates: true });
-  } catch {
-    // already exists / race
-  }
-  return TMP_DIR;
-}
-
 function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, "_");
 }
 
+// The new expo-file-system API has no web implementation (constructors throw),
+// so files are only materialized on native platforms.
+// Media is stored in the persistent document directory (survives reboots and
+// system cache cleanups). The directory is (re)created on every access with
+// idempotent+intermediates so a missing folder can never cause an ENOENT.
+function ensureMediaDir(): Directory | null {
+  if (Platform.OS === "web") return null;
+  const dir = new Directory(Paths.document, "indoor-media");
+  try {
+    dir.create({ intermediates: true, idempotent: true });
+  } catch {
+    // idempotent should not throw; ignore any residual race
+  }
+  return dir;
+}
+
 export function fileFor(name: string): File | null {
-  const dir = getMediaDir();
+  const dir = ensureMediaDir();
   if (!dir) return null;
   return new File(dir, safeName(name));
 }
 
 export async function downloadMedia(item: PlaylistItem): Promise<{ ok: boolean; error?: string }> {
-  const mediaDir = getMediaDir();
-  const tmpDir = getTmpDir();
-  if (!mediaDir || !tmpDir) {
+  const dir = ensureMediaDir();
+  if (!dir) {
     return { ok: false, error: "downloads indisponíveis nesta plataforma" };
   }
-  const dest = fileFor(item.name);
-  const tmp = new File(tmpDir, safeName(item.name));
+  const dest = new File(dir, safeName(item.name));
   try {
-    if (tmp.exists) tmp.delete();
-    await File.downloadFileAsync(driveDownloadUrl(item.fileId), tmp, { idempotent: true });
-    if (!tmp.exists || tmp.size === 0) {
+    if (dest.exists) dest.delete();
+    // Downloads straight into the persistent media directory (which we just ensured exists)
+    await File.downloadFileAsync(driveDownloadUrl(item.fileId), dest, { idempotent: true });
+    if (!dest.exists || dest.size === 0) {
+      if (dest.exists) dest.delete();
       return { ok: false, error: "download vazio" };
     }
-    if (dest?.exists) dest.delete();
-    await tmp.move(mediaDir);
     return { ok: true };
   } catch (e) {
     try {
-      if (tmp.exists) tmp.delete();
+      if (dest.exists) dest.delete();
     } catch {
       // ignore cleanup errors
     }
