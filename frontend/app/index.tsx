@@ -15,8 +15,6 @@ import { recordSyncOutcome, syncNow } from "@/src/lib/sync";
 import type { AppSettings, LocalMedia, SyncStatus } from "@/src/lib/types";
 import { makeStyles, useTheme } from "@/src/theme";
 
-const SYNC_INTERVAL_MS = 60_000;
-
 export default function PlayerScreen() {
   useKeepAwake();
   const insets = useSafeAreaInsets();
@@ -34,6 +32,7 @@ export default function PlayerScreen() {
   const itemsRef = useRef<LocalMedia[]>([]);
   const pendingRef = useRef<LocalMedia[] | null>(null);
   const settingsRef = useRef<AppSettings>(defaultSettings);
+  const currentNameRef = useRef<string | null>(null);
   const syncBusyRef = useRef(false);
   const overlayRef = useRef(false);
   const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,11 +44,14 @@ export default function PlayerScreen() {
   const advance = useCallback(() => {
     const pending = pendingRef.current;
     if (pending && pending.length > 0) {
-      // new playlist was validated during sync: activate it when the current media ends
+      // New playlist validated during sync: activate it when the current media ends,
+      // continuing right after the item that just played (no jump back to the first).
       pendingRef.current = null;
       itemsRef.current = pending;
       setItems(pending);
-      setIndex(0);
+      const playedName = currentNameRef.current;
+      const foundAt = playedName ? pending.findIndex((m) => m.name === playedName) : -1;
+      setIndex(foundAt >= 0 ? (foundAt + 1) % pending.length : 0);
       return;
     }
     const len = itemsRef.current.length;
@@ -118,9 +120,10 @@ export default function PlayerScreen() {
         firstSync = setTimeout(() => {
           void runSync();
         }, 2000);
+        const intervalMs = Math.max(1, Math.round(s.syncIntervalMin || 1)) * 60_000;
         interval = setInterval(() => {
           void runSync();
-        }, SYNC_INTERVAL_MS);
+        }, intervalMs);
       })();
       // Back button keeps the player alive (signage must not exit accidentally)
       const backSub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -154,6 +157,7 @@ export default function PlayerScreen() {
   };
 
   const currentItem = items.length > 0 ? items[index % items.length] : null;
+  currentNameRef.current = currentItem ? currentItem.name : null;
   const currentUri = currentItem ? localUriFor(currentItem.name) : null;
   const sourceUri = currentItem ? currentUri ?? driveDownloadUrl(currentItem.fileId) : "";
 

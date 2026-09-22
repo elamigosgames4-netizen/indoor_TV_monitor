@@ -6,6 +6,7 @@ const K = {
   deviceName: "@indoor/deviceName",
   folderLink: "@indoor/folderLink",
   photoDurationSec: "@indoor/photoDurationSec",
+  syncIntervalMin: "@indoor/syncIntervalMin",
   rotation: "@indoor/rotation",
   autostart: "@indoor/autostart",
   manifest: "@indoor/manifest",
@@ -18,6 +19,7 @@ export const defaultSettings: AppSettings = {
   deviceName: "Player 1",
   folderLink: "",
   photoDurationSec: 10,
+  syncIntervalMin: 1,
   rotation: "0",
   autostart: true,
 };
@@ -38,6 +40,7 @@ export async function loadSettings(): Promise<AppSettings> {
   const deviceName = await storage.getItem<string>(K.deviceName, defaultSettings.deviceName);
   const folderLink = await storage.getItem<string>(K.folderLink, "");
   const storedDuration = await storage.getItem<number>(K.photoDurationSec, defaultSettings.photoDurationSec);
+  const storedInterval = await storage.getItem<number>(K.syncIntervalMin, defaultSettings.syncIntervalMin);
   const storedRotation = await storage.getItem<string>(K.rotation, defaultSettings.rotation);
   const autostart = await storage.getItem<boolean>(K.autostart, defaultSettings.autostart);
   return {
@@ -45,6 +48,8 @@ export async function loadSettings(): Promise<AppSettings> {
     folderLink: typeof folderLink === "string" ? folderLink : "",
     photoDurationSec:
       typeof storedDuration === "number" && storedDuration >= 1 ? Math.round(storedDuration) : 10,
+    syncIntervalMin:
+      typeof storedInterval === "number" && storedInterval >= 1 ? Math.round(storedInterval) : 1,
     rotation: ROTATION_VALUES.includes(storedRotation as Rotation) ? (storedRotation as Rotation) : "0",
     autostart: autostart !== false,
   };
@@ -55,6 +60,7 @@ export async function saveSettings(s: AppSettings): Promise<void> {
     storage.setItem(K.deviceName, s.deviceName.trim() || "Player 1"),
     storage.setItem(K.folderLink, s.folderLink.trim()),
     storage.setItem(K.photoDurationSec, s.photoDurationSec),
+    storage.setItem(K.syncIntervalMin, s.syncIntervalMin),
     storage.setItem(K.rotation, s.rotation),
     storage.setItem(K.autostart, s.autostart),
   ]);

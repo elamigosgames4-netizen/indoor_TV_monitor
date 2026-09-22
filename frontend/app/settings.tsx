@@ -35,6 +35,7 @@ export default function SettingsScreen() {
 
   const [form, setForm] = useState<AppSettings>(defaultSettings);
   const [durationText, setDurationText] = useState("10");
+  const [intervalText, setIntervalText] = useState("1");
   const [manifest, setManifest] = useState<LocalMedia[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ lastSyncAt: null, lastSyncOk: true, errors: [] });
   const [busy, setBusy] = useState<"save" | "sync" | null>(null);
@@ -46,6 +47,7 @@ export default function SettingsScreen() {
         const [s, m, st] = await Promise.all([loadSettings(), loadManifest(), loadSyncStatus()]);
         setForm(s);
         setDurationText(String(s.photoDurationSec));
+        setIntervalText(String(s.syncIntervalMin));
         setManifest(m);
         setSyncStatus(st);
       })();
@@ -62,6 +64,12 @@ export default function SettingsScreen() {
       setBusy(null);
       return;
     }
+    const interval = Number.parseInt(intervalText, 10);
+    if (!Number.isFinite(interval) || interval < 1 || interval > 1440) {
+      setMessage({ kind: "error", text: "Intervalo de verificação inválido: use um número entre 1 e 1440 minutos." });
+      setBusy(null);
+      return;
+    }
     const link = form.folderLink.trim();
     if (link) {
       try {
@@ -73,7 +81,7 @@ export default function SettingsScreen() {
         return;
       }
     }
-    const s: AppSettings = { ...form, folderLink: link, photoDurationSec: duration };
+    const s: AppSettings = { ...form, folderLink: link, photoDurationSec: duration, syncIntervalMin: interval };
     await saveSettings(s);
 
     const localManifest = await loadManifest();
@@ -194,6 +202,20 @@ export default function SettingsScreen() {
         keyboardType="number-pad"
         maxLength={4}
       />
+
+      <Text style={styles.label}>Verificar novos arquivos a cada (minutos)</Text>
+      <TextInput
+        testID="settings-sync-interval-input"
+        style={styles.input}
+        value={intervalText}
+        onChangeText={setIntervalText}
+        keyboardType="number-pad"
+        maxLength={4}
+      />
+      <Text style={styles.hint}>
+        Enquanto o player estiver aberto e conectado, a pasta é verificada nesse intervalo. Arquivos novos entram na
+        fila sem interromper o vídeo atual — começam a tocar quando a mídia atual terminar.
+      </Text>
 
       <Text style={styles.label}>Rotação da tela</Text>
       <View style={styles.rotationRow}>

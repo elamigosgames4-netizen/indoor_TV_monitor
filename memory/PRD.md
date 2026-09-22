@@ -9,6 +9,10 @@ Criar do zero um aplicativo de mídia indoor para Android, inspirado no MK Indoo
 - **Banco:** MongoDB (cache de resolução; futuramente batimentos dos aparelhos na Etapa 2).
 - **Autostart nativo:** config plugin `plugins/withAutostart.js` (BootReceiver Kotlin + RECEIVE_BOOT_COMPLETED/WAKE_LOCK + LEANBACK_LAUNCHER; dispara deep link `indoorplayer://boot`).
 
+## Ajustes (22/09/2026 — parte 3)
+- **Intervalo de verificação configurável em minutos:** novo campo "Verificar novos arquivos a cada (minutos)" (`syncIntervalMin`, padrão 1, faixa 1–1440). O timer de sincronização do player usa esse valor no lugar do fixo de 60s.
+- **Continuidade da fila:** ao ativar uma nova playlist (arquivos novos), o player continua a partir do item **seguinte ao que acabou de tocar**, em vez de voltar ao primeiro — a fila cresce sem interromper o vídeo atual. Loop contínuo mantido (após o último, volta ao primeiro).
+
 ## Correções (22/09/2026)
 - **Tela preta no vídeo (Android):** `expo-video` usa `SurfaceView` por padrão, que não respeita o transform de rotação e renderiza preto dentro da view rotacionada. Corrigido com `surfaceType="textureView"` + `useExoShutter={false}` em `VideoItem.tsx`.
 - **Multi-TV com links diferentes:** cada aparelho guarda o próprio link/config localmente (AsyncStorage); basta instalar o APK em cada TV e configurar um link diferente por aparelho — já funciona por design.

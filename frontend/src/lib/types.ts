@@ -26,6 +26,7 @@ export interface AppSettings {
   deviceName: string;
   folderLink: string;
   photoDurationSec: number;
+  syncIntervalMin: number;
   rotation: Rotation;
   autostart: boolean;
 }
