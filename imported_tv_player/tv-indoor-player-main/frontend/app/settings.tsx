@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { ActivityIndicator, Switch, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Switch, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,18 +7,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FocusablePressable } from "@/src/components/FocusablePressable";
 import { resolveFolder } from "@/src/lib/backend";
 import { formatDateTimeBr } from "@/src/lib/format";
-import { appVersion, restartMonitoring, sendHeartbeat } from "@/src/lib/monitoring";
 import {
   defaultSettings,
   loadManifest,
-  loadMonitoringStatus,
   loadSettings,
   loadSyncStatus,
   saveManifest,
   saveSettings,
 } from "@/src/lib/settings";
 import { recordSyncOutcome, syncNow } from "@/src/lib/sync";
-import type { AppSettings, LocalMedia, MonitoringStatus, Rotation, SyncStatus } from "@/src/lib/types";
+import type { AppSettings, LocalMedia, Rotation, SyncStatus } from "@/src/lib/types";
 import { makeStyles, useTheme } from "@/src/theme";
 
 const ROTATIONS: { value: Rotation; label: string; id: string }[] = [
@@ -38,34 +36,20 @@ export default function SettingsScreen() {
   const [form, setForm] = useState<AppSettings>(defaultSettings);
   const [durationText, setDurationText] = useState("10");
   const [intervalText, setIntervalText] = useState("1");
-  const [monitorIntervalText, setMonitorIntervalText] = useState("20");
   const [manifest, setManifest] = useState<LocalMedia[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ lastSyncAt: null, lastSyncOk: true, errors: [] });
-  const [monitorStatus, setMonitorStatus] = useState<MonitoringStatus>({
-    configured: false,
-    lastHeartbeatAt: null,
-    lastHeartbeatOk: null,
-    lastHeartbeatError: null,
-  });
-  const [busy, setBusy] = useState<"save" | "sync" | "monitor" | "test" | null>(null);
+  const [busy, setBusy] = useState<"save" | "sync" | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const [s, m, st, monitor] = await Promise.all([
-          loadSettings(),
-          loadManifest(),
-          loadSyncStatus(),
-          loadMonitoringStatus(),
-        ]);
+        const [s, m, st] = await Promise.all([loadSettings(), loadManifest(), loadSyncStatus()]);
         setForm(s);
         setDurationText(String(s.photoDurationSec));
         setIntervalText(String(s.syncIntervalMin));
-        setMonitorIntervalText(String(s.monitorIntervalSec));
         setManifest(m);
         setSyncStatus(st);
-        setMonitorStatus(monitor);
       })();
     }, []),
   );
@@ -97,23 +81,8 @@ export default function SettingsScreen() {
         return;
       }
     }
-    const monitorInterval = Number.parseInt(monitorIntervalText, 10);
-    if (!Number.isFinite(monitorInterval) || monitorInterval < 5 || monitorInterval > 3600) {
-      setMessage({ kind: "error", text: "Intervalo do monitor inválido: use um número entre 5 e 3600 segundos." });
-      setBusy(null);
-      return;
-    }
-    const s: AppSettings = {
-      ...form,
-      folderLink: link,
-      photoDurationSec: duration,
-      syncIntervalMin: interval,
-      monitorTvCode: form.monitorTvCode.trim(),
-      monitorServerUrl: form.monitorServerUrl.trim() || defaultSettings.monitorServerUrl,
-      monitorIntervalSec: monitorInterval,
-    };
+    const s: AppSettings = { ...form, folderLink: link, photoDurationSec: duration, syncIntervalMin: interval };
     await saveSettings(s);
-    restartMonitoring(s);
 
     const localManifest = await loadManifest();
     const outcome = await syncNow(s, localManifest);
@@ -133,69 +102,6 @@ export default function SettingsScreen() {
       kind: "error",
       text: outcome.error ?? "Não foi possível sincronizar. Verifique o link e a conexão.",
     });
-    setBusy(null);
-  };
-
-  const handleSaveMonitoring = async () => {
-    if (busy) return;
-    setMessage(null);
-    const monitorInterval = Number.parseInt(monitorIntervalText, 10);
-    const serverUrl = form.monitorServerUrl.trim();
-    if (!serverUrl || !/^https?:\/\//i.test(serverUrl)) {
-      setMessage({ kind: "error", text: "Informe uma URL de monitoramento válida, começando com http:// ou https://." });
-      return;
-    }
-    if (!Number.isFinite(monitorInterval) || monitorInterval < 5 || monitorInterval > 3600) {
-      setMessage({ kind: "error", text: "Intervalo do monitor inválido: use um número entre 5 e 3600 segundos." });
-      return;
-    }
-    setBusy("monitor");
-    const nextSettings: AppSettings = {
-      ...form,
-      monitorTvCode: form.monitorTvCode.trim(),
-      monitorServerUrl: serverUrl,
-      monitorIntervalSec: monitorInterval,
-    };
-    await saveSettings(nextSettings);
-    restartMonitoring(nextSettings);
-    setForm(nextSettings);
-    setMonitorStatus(await loadMonitoringStatus());
-    setMessage({
-      kind: "success",
-      text: nextSettings.monitorTvCode ? "Monitoramento salvo e iniciado automaticamente." : "Monitoramento salvo. Informe o código da TV para iniciar os envios.",
-    });
-    setBusy(null);
-  };
-
-  const handleTestHeartbeat = async () => {
-    if (busy) return;
-    const serverUrl = form.monitorServerUrl.trim();
-    const monitorInterval = Number.parseInt(monitorIntervalText, 10);
-    if (!form.monitorTvCode.trim()) {
-      setMessage({ kind: "error", text: "Informe o código da TV antes de testar o heartbeat." });
-      return;
-    }
-    if (!serverUrl || !/^https?:\/\//i.test(serverUrl)) {
-      setMessage({ kind: "error", text: "Informe uma URL de monitoramento válida antes de testar." });
-      return;
-    }
-    if (!Number.isFinite(monitorInterval) || monitorInterval < 5 || monitorInterval > 3600) {
-      setMessage({ kind: "error", text: "Intervalo do monitor inválido: use um número entre 5 e 3600 segundos." });
-      return;
-    }
-    setBusy("test");
-    const status = await sendHeartbeat({
-      ...form,
-      monitorTvCode: form.monitorTvCode.trim(),
-      monitorServerUrl: serverUrl,
-      monitorIntervalSec: monitorInterval,
-    });
-    setMonitorStatus(status);
-    setMessage(
-      status.lastHeartbeatOk
-        ? { kind: "success", text: `Heartbeat enviado com sucesso — versão ${appVersion()}.` }
-        : { kind: "error", text: status.lastHeartbeatError ?? "Não foi possível enviar o heartbeat." },
-    );
     setBusy(null);
   };
 
@@ -346,117 +252,6 @@ export default function SettingsScreen() {
         preciso ativar &quot;Início automático&quot; nas configurações do fabricante.
       </Text>
 
-      <View style={styles.monitorCard} testID="settings-monitoring-section">
-        <View style={styles.monitorHeader}>
-          <View style={styles.monitorHeaderText}>
-            <Text style={styles.sectionTitle}>Monitoramento</Text>
-            <Text style={styles.sectionSubtitle}>Heartbeat automático enquanto o player estiver em execução</Text>
-          </View>
-          <View
-            testID="settings-monitoring-status"
-            style={[
-              styles.statusPill,
-              monitorStatus.lastHeartbeatOk === true
-                ? styles.statusPillSuccess
-                : monitorStatus.lastHeartbeatOk === false
-                  ? styles.statusPillError
-                  : styles.statusPillNeutral,
-            ]}
-          >
-            <Text style={styles.statusPillText}>
-              {monitorStatus.lastHeartbeatOk === true
-                ? "Online"
-                : monitorStatus.lastHeartbeatOk === false
-                  ? "Falha"
-                  : monitorStatus.configured
-                    ? "Aguardando"
-                    : "Não configurado"}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.label}>Código da TV</Text>
-        <TextInput
-          testID="settings-monitor-tv-code-input"
-          style={styles.input}
-          value={form.monitorTvCode}
-          onChangeText={(t) => setForm((f) => ({ ...f, monitorTvCode: t }))}
-          placeholder="Ex.: WEYEN_LOJA_01"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={80}
-        />
-
-        <Text style={styles.label}>URL do servidor de monitoramento</Text>
-        <TextInput
-          testID="settings-monitor-url-input"
-          style={styles.input}
-          value={form.monitorServerUrl}
-          onChangeText={(t) => setForm((f) => ({ ...f, monitorServerUrl: t }))}
-          placeholder="https://servidor.exemplo/heartbeat"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          maxLength={500}
-        />
-
-        <Text style={styles.label}>Intervalo de envio (segundos)</Text>
-        <TextInput
-          testID="settings-monitor-interval-input"
-          style={styles.input}
-          value={monitorIntervalText}
-          onChangeText={setMonitorIntervalText}
-          keyboardType="number-pad"
-          maxLength={4}
-        />
-        <Text style={styles.hint}>
-          Padrão: 20 segundos. O envio inclui código da TV, status online, data/hora e versão {appVersion()}.
-        </Text>
-
-        {monitorStatus.lastHeartbeatAt && (
-          <Text testID="settings-monitor-last-heartbeat" style={styles.infoLine}>
-            Último envio: {formatDateTimeBr(monitorStatus.lastHeartbeatAt)}
-            {monitorStatus.lastHeartbeatOk === false ? " — com erro" : ""}
-          </Text>
-        )}
-        {monitorStatus.lastHeartbeatError && (
-          <Text testID="settings-monitor-error" style={styles.errorLine} numberOfLines={3}>
-            {monitorStatus.lastHeartbeatError}
-          </Text>
-        )}
-
-        <View style={styles.monitorActions}>
-          <FocusablePressable
-            testID="settings-monitor-save-button"
-            onPress={handleSaveMonitoring}
-            disabled={busy !== null}
-            style={[styles.button, styles.monitorSaveButton, busy !== null && styles.buttonDisabled]}
-            focusedStyle={styles.buttonFocused}
-          >
-            {busy === "monitor" ? (
-              <ActivityIndicator color={colors.onBrandPrimary} />
-            ) : (
-              <Text style={styles.primaryButtonText}>Salvar monitoramento</Text>
-            )}
-          </FocusablePressable>
-          <FocusablePressable
-            testID="settings-monitor-test-button"
-            onPress={handleTestHeartbeat}
-            disabled={busy !== null}
-            style={[styles.button, busy !== null && styles.buttonDisabled]}
-            focusedStyle={styles.buttonFocused}
-          >
-            {busy === "test" ? (
-              <ActivityIndicator color={colors.onSurfaceSecondary} />
-            ) : (
-              <Text style={styles.buttonText}>Enviar teste agora</Text>
-            )}
-          </FocusablePressable>
-        </View>
-      </View>
-
       {message && (
         <View
           testID="settings-message"
@@ -522,7 +317,6 @@ export default function SettingsScreen() {
           </View>
         )}
       </View>
-      <Text style={styles.attribution}>feito por Tiago Rodrigues 64 9 84468273</Text>
     </KeyboardAwareScrollView>
   );
 }
@@ -570,65 +364,6 @@ const useStyles = makeStyles((colors) => ({
     color: colors.muted,
     fontSize: 12,
     marginTop: 4,
-  },
-  monitorCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSecondary,
-    padding: 16,
-    marginTop: 20,
-    gap: 4,
-  },
-  monitorHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 8,
-  },
-  monitorHeaderText: {
-    flex: 1,
-    gap: 4,
-  },
-  sectionTitle: {
-    color: colors.onSurface,
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  sectionSubtitle: {
-    color: colors.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  statusPill: {
-    minHeight: 32,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statusPillSuccess: {
-    backgroundColor: colors.success,
-  },
-  statusPillError: {
-    backgroundColor: colors.error,
-  },
-  statusPillNeutral: {
-    backgroundColor: colors.surfaceTertiary,
-  },
-  statusPillText: {
-    color: colors.onSurface,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  monitorActions: {
-    gap: 8,
-    marginTop: 8,
-  },
-  monitorSaveButton: {
-    backgroundColor: colors.brandPrimary,
-    borderColor: colors.brandPrimary,
   },
   rotationRow: {
     flexDirection: "row",
@@ -743,11 +478,5 @@ const useStyles = makeStyles((colors) => ({
   errorLine: {
     color: colors.onSurfaceSecondary,
     fontSize: 12,
-  },
-  attribution: {
-    color: colors.muted,
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 24,
   },
 }));

@@ -1,11 +1,11 @@
 import type { MediaType, ResolvedFolder } from "./types";
 
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
+if (!BASE) {
+  throw new Error("EXPO_PUBLIC_BACKEND_URL não configurada");
+}
 
 export async function resolveFolder(link: string): Promise<ResolvedFolder> {
-  if (!BASE) {
-    throw new Error("EXPO_PUBLIC_BACKEND_URL não configurada");
-  }
   const res = await fetch(`${BASE}/api/drive/resolve?link=${encodeURIComponent(link)}`, {
     headers: { Accept: "application/json" },
   });

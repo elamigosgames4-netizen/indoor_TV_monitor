@@ -1,6 +1,6 @@
 import { storage } from "@/src/utils/storage";
 
-import type { AppSettings, LocalMedia, MonitoringStatus, Rotation, SyncStatus } from "./types";
+import type { AppSettings, LocalMedia, Rotation, SyncStatus } from "./types";
 
 const K = {
   deviceName: "@indoor/deviceName",
@@ -9,12 +9,6 @@ const K = {
   syncIntervalMin: "@indoor/syncIntervalMin",
   rotation: "@indoor/rotation",
   autostart: "@indoor/autostart",
-  monitorTvCode: "@indoor/monitorTvCode",
-  monitorServerUrl: "@indoor/monitorServerUrl",
-  monitorIntervalSec: "@indoor/monitorIntervalSec",
-  monitorLastHeartbeatAt: "@indoor/monitorLastHeartbeatAt",
-  monitorLastHeartbeatOk: "@indoor/monitorLastHeartbeatOk",
-  monitorLastHeartbeatError: "@indoor/monitorLastHeartbeatError",
   manifest: "@indoor/manifest",
   lastSyncAt: "@indoor/lastSyncAt",
   lastSyncOk: "@indoor/lastSyncOk",
@@ -28,9 +22,6 @@ export const defaultSettings: AppSettings = {
   syncIntervalMin: 1,
   rotation: "0",
   autostart: true,
-  monitorTvCode: "",
-  monitorServerUrl: "https://falacom.com.br/tv-monitor/api/heartbeat.php",
-  monitorIntervalSec: 20,
 };
 
 const ROTATION_VALUES: Rotation[] = ["0", "90", "-90", "180"];
@@ -52,9 +43,6 @@ export async function loadSettings(): Promise<AppSettings> {
   const storedInterval = await storage.getItem<number>(K.syncIntervalMin, defaultSettings.syncIntervalMin);
   const storedRotation = await storage.getItem<string>(K.rotation, defaultSettings.rotation);
   const autostart = await storage.getItem<boolean>(K.autostart, defaultSettings.autostart);
-  const monitorTvCode = await storage.getItem<string>(K.monitorTvCode, defaultSettings.monitorTvCode);
-  const monitorServerUrl = await storage.getItem<string>(K.monitorServerUrl, defaultSettings.monitorServerUrl);
-  const storedMonitorInterval = await storage.getItem<number>(K.monitorIntervalSec, defaultSettings.monitorIntervalSec);
   return {
     deviceName: typeof deviceName === "string" && deviceName ? deviceName : "Player 1",
     folderLink: typeof folderLink === "string" ? folderLink : "",
@@ -64,15 +52,6 @@ export async function loadSettings(): Promise<AppSettings> {
       typeof storedInterval === "number" && storedInterval >= 1 ? Math.round(storedInterval) : 1,
     rotation: ROTATION_VALUES.includes(storedRotation as Rotation) ? (storedRotation as Rotation) : "0",
     autostart: autostart !== false,
-    monitorTvCode: typeof monitorTvCode === "string" ? monitorTvCode : "",
-    monitorServerUrl:
-      typeof monitorServerUrl === "string" && monitorServerUrl.trim()
-        ? monitorServerUrl.trim()
-        : defaultSettings.monitorServerUrl,
-    monitorIntervalSec:
-      typeof storedMonitorInterval === "number" && storedMonitorInterval >= 5
-        ? Math.min(3600, Math.round(storedMonitorInterval))
-        : defaultSettings.monitorIntervalSec,
   };
 }
 
@@ -84,33 +63,6 @@ export async function saveSettings(s: AppSettings): Promise<void> {
     storage.setItem(K.syncIntervalMin, s.syncIntervalMin),
     storage.setItem(K.rotation, s.rotation),
     storage.setItem(K.autostart, s.autostart),
-    storage.setItem(K.monitorTvCode, s.monitorTvCode.trim()),
-    storage.setItem(K.monitorServerUrl, s.monitorServerUrl.trim() || defaultSettings.monitorServerUrl),
-    storage.setItem(K.monitorIntervalSec, s.monitorIntervalSec),
-  ]);
-}
-
-export async function loadMonitoringStatus(): Promise<MonitoringStatus> {
-  const [lastHeartbeatAt, lastHeartbeatOk, lastHeartbeatError, settings] = await Promise.all([
-    storage.getItem<string>(K.monitorLastHeartbeatAt, ""),
-    storage.getItem<boolean | null>(K.monitorLastHeartbeatOk, null),
-    storage.getItem<string>(K.monitorLastHeartbeatError, ""),
-    loadSettings(),
-  ]);
-  const configured = Boolean(settings.monitorTvCode.trim() && settings.monitorServerUrl.trim());
-  return {
-    configured,
-    lastHeartbeatAt: configured ? lastHeartbeatAt || null : null,
-    lastHeartbeatOk: configured && typeof lastHeartbeatOk === "boolean" ? lastHeartbeatOk : null,
-    lastHeartbeatError: configured ? lastHeartbeatError || null : null,
-  };
-}
-
-export async function saveMonitoringStatus(status: MonitoringStatus): Promise<void> {
-  await Promise.all([
-    storage.setItem(K.monitorLastHeartbeatAt, status.lastHeartbeatAt ?? ""),
-    storage.setItem(K.monitorLastHeartbeatOk, status.lastHeartbeatOk),
-    storage.setItem(K.monitorLastHeartbeatError, status.lastHeartbeatError ?? ""),
   ]);
 }
 

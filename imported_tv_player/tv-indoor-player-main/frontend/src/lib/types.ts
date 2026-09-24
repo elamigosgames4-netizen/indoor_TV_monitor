@@ -29,16 +29,6 @@ export interface AppSettings {
   syncIntervalMin: number;
   rotation: Rotation;
   autostart: boolean;
-  monitorTvCode: string;
-  monitorServerUrl: string;
-  monitorIntervalSec: number;
-}
-
-export interface MonitoringStatus {
-  configured: boolean;
-  lastHeartbeatAt: string | null;
-  lastHeartbeatOk: boolean | null;
-  lastHeartbeatError: string | null;
 }
 
 export interface SyncStatus {

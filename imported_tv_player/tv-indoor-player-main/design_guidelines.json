@@ -1,0 +1,100 @@
+{
+  "app_name": "TV Indoor Player - Monitoramento",
+  "personality": "7 Dark-First Utility",
+  "personality_one_liner": "Command-center operational utility with high-contrast tactical metrics and reliable background heartbeat scheduling.",
+  "color": {
+    "surface": "#0f1115",
+    "onSurface": "#f1f3f7",
+    "surfaceSecondary": "#181b22",
+    "onSurfaceSecondary": "#f1f3f7",
+    "surfaceTertiary": "#222731",
+    "onSurfaceTertiary": "#f1f3f7",
+    "surfaceInverse": "#ffffff",
+    "onSurfaceInverse": "#0f1115",
+    "brand": "#e056fd",
+    "brandPrimary": "#f39c12",
+    "onBrandPrimary": "#0f1115",
+    "brandSecondary": "#e67e22",
+    "onBrandSecondary": "#0f1115",
+    "brandTertiary": "#2d2417",
+    "onBrandTertiary": "#f39c12",
+    "success": "#2ecc71",
+    "onSuccess": "#0f1115",
+    "warning": "#f1c40f",
+    "onWarning": "#0f1115",
+    "error": "#e74c3c",
+    "onError": "#f1f3f7",
+    "info": "#3498db",
+    "onInfo": "#0f1115",
+    "border": "#282d38",
+    "borderStrong": "#f39c12",
+    "divider": "#222731",
+    "muted": "#95a5a6",
+    "onBrand": "#0f1115"
+  },
+  "typography": {
+    "displayFontFamily": "System",
+    "textFontFamily": "System",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous touch targets and clean vertical rhythm for TV Android remote and mobile settings.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 0,
+  "navigation": "stack_only",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [
+      "Keep high-contrast clarity for TV player and settings screens"
+    ],
+    "dont's": [
+      "Avoid low-contrast overlays and blur on TV Android targets"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Settings",
+      "purpose": "Configure TV Code, Monitoring Server URL, and Heartbeat Interval with real-time status and attribution.",
+      "states": {
+        "loading": "Loading settings...",
+        "empty": "No settings configured",
+        "error": "Failed to save configuration"
+      },
+      "layout": "Scrollable vertical list with card sections for TV Player configuration and Monitoramento settings, plus visual test heartbeat button and Tiago Rodrigues attribution footer."
+    }
+  ],
+  "images": {},
+  "instructions_to_main_agent": "Preserve existing TV Indoor Player functionality (videos, images, news, Google Drive sync). Add local storage persistence for monitoring settings (server URL, tv code, interval). Implement background heartbeat sender sending POST JSON with tv_code, status, timestamp, and app_version. Include credit text 'feito por Tiago Rodrigues 64 9 84468273'."
+}
