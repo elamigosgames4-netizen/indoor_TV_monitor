@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Switch, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,7 +18,7 @@ import {
   saveSettings,
 } from "@/src/lib/settings";
 import { recordSyncOutcome, syncNow } from "@/src/lib/sync";
-import type { AppSettings, LocalMedia, MonitoringStatus, Rotation, SyncStatus } from "@/src/lib/types";
+import type { AppSettings, HeartbeatDiagnostic, LocalMedia, MonitoringStatus, Rotation, SyncStatus } from "@/src/lib/types";
 import { makeStyles, useTheme } from "@/src/theme";
 
 const ROTATIONS: { value: Rotation; label: string; id: string }[] = [
@@ -56,6 +56,7 @@ export default function SettingsScreen() {
     lastHeartbeatOk: null,
     lastHeartbeatError: null,
   });
+  const [testDiagnostic, setTestDiagnostic] = useState<HeartbeatDiagnostic | null>(null);
   const [busy, setBusy] = useState<"save" | "sync" | "monitor" | "test" | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
 
@@ -199,13 +200,15 @@ export default function SettingsScreen() {
       return;
     }
     setBusy("test");
-    const status = await sendHeartbeat({
+    setTestDiagnostic(null);
+    const { status, diagnostic } = await sendHeartbeat({
       ...form,
-      monitorTvCode: form.monitorTvCode.trim(),
+      monitorTvCode: form.monitorTvCode,
       monitorServerUrl: serverUrl,
       monitorIntervalSec: monitorInterval,
     });
     setMonitorStatus(status);
+    setTestDiagnostic(diagnostic);
     setMessage(
       status.lastHeartbeatOk
         ? { kind: "success", text: `Heartbeat enviado com sucesso — versão ${appVersion()}.` }
@@ -470,6 +473,37 @@ export default function SettingsScreen() {
             )}
           </FocusablePressable>
         </View>
+
+        {testDiagnostic && (
+          <View testID="settings-monitor-diagnostic" style={styles.diagnostic}>
+            <Text style={styles.diagnosticTitle}>Log do último teste</Text>
+            <Text style={styles.diagnosticLabel}>Método</Text>
+            <Text testID="settings-monitor-diag-method" style={styles.diagnosticValue}>
+              {testDiagnostic.method}
+            </Text>
+            <Text style={styles.diagnosticLabel}>URL chamada</Text>
+            <Text testID="settings-monitor-diag-url" style={styles.diagnosticValue} selectable>
+              {testDiagnostic.requestUrl ?? "—"}
+            </Text>
+            <Text style={styles.diagnosticLabel}>
+              Parâmetro codigo enviado{" "}
+              {testDiagnostic.codigoRawLength !== null && testDiagnostic.codigoCleanLength !== null
+                ? testDiagnostic.codigoRawLength !== testDiagnostic.codigoCleanLength
+                  ? `(removidos ${testDiagnostic.codigoRawLength - testDiagnostic.codigoCleanLength} caracteres invisíveis)`
+                  : `(${testDiagnostic.codigoCleanLength} caracteres, sem espaços)`
+                : ""}
+            </Text>
+            <Text testID="settings-monitor-diag-codigo" style={styles.diagnosticValue} selectable>
+              {testDiagnostic.codigoSent ?? "—"}
+            </Text>
+            <Text style={styles.diagnosticLabel}>
+              Resposta da API {testDiagnostic.responseStatus !== null ? `(HTTP ${testDiagnostic.responseStatus})` : ""}
+            </Text>
+            <Text testID="settings-monitor-diag-response" style={styles.diagnosticValue} selectable>
+              {testDiagnostic.responseSnippet ?? "—"}
+            </Text>
+          </View>
+        )}
       </View>
 
       {message && (
@@ -646,6 +680,35 @@ const useStyles = makeStyles((colors) => ({
   monitorSaveButton: {
     backgroundColor: colors.brandPrimary,
     borderColor: colors.brandPrimary,
+  },
+  diagnostic: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceTertiary,
+    padding: 12,
+    gap: 2,
+  },
+  diagnosticTitle: {
+    color: colors.onSurface,
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  diagnosticLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  diagnosticValue: {
+    color: colors.onSurface,
+    fontSize: 12,
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    lineHeight: 16,
   },
   rotationRow: {
     flexDirection: "row",

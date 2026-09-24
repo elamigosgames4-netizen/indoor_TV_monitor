@@ -41,6 +41,16 @@ export interface MonitoringStatus {
   lastHeartbeatError: string | null;
 }
 
+export interface HeartbeatDiagnostic {
+  method: string;
+  requestUrl: string | null;
+  codigoSent: string | null;
+  codigoRawLength: number | null;
+  codigoCleanLength: number | null;
+  responseStatus: number | null;
+  responseSnippet: string | null;
+}
+
 export interface SyncStatus {
   lastSyncAt: string | null;
   lastSyncOk: boolean;

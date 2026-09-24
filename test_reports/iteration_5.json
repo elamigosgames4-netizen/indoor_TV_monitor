@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 5 heartbeat fix (GET ?codigo=<tv_code>) verified end-to-end. Backend: 7/7 pytest cases passed against POST /api/monitor/heartbeat — real falacom endpoint responds 200 'OK'; codigo normalization strips spaces, tabs, newlines, zero-width chars; existing query strings are preserved; a pre-existing 'codigo' param on server_url is replaced by the body's tv_code (exactly one 'codigo=' remains); invalid server_url returns HTTP 400 with Portuguese detail. Frontend: /settings screen — entering ' WEYEN_LOJA_01 ' (with leading/trailing spaces) and tapping settings-monitor-test-button renders the diagnostic panel with method=GET, url ending in '?codigo=WEYEN_LOJA_01' (no encoded spaces), codigo=WEYEN_LOJA_01, response=OK. Success message reads 'Heartbeat enviado com sucesso — versão 1.0.0.' and the status pill flips to 'Online'. Regression: TV code / URL / interval fields, Salvar monitoramento + Enviar teste agora buttons, and the settings-attribution 'FEITO por Tiago Rodrigues 64 9 84468273' are all still present. No React Native / Expo deprecation issues detected in the touched files.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_heartbeat.py",
+    "/app/test_reports/pytest/heartbeat_results.xml",
+    "/app/test_reports/ui/heartbeat_diag.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: logger is instantiated AFTER routes reference it (lines 232, 247, 162). Currently works because logger names are resolved at call time and the module-level logger is created before the first request, but keeping the getLogger call above the route definitions would be cleaner and more predictable.",
+    "monitoring.ts sends the raw (untrimmed) monitorTvCode to the backend on purpose so codigo_raw_length can reflect what the user typed — good behavior; keep as-is."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Tests hit real endpoints (falacom.com.br and httpbin.org) but do not persist data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Heartbeat proxy at POST /api/monitor/heartbeat now returns diagnostic fields (method, request_url, codigo_sent, codigo_raw_length, codigo_clean_length, status_code, response_snippet). Frontend /settings surfaces them under testID 'settings-monitor-diagnostic' with sub-testIDs settings-monitor-diag-{method,url,codigo,response}. Do NOT verify by browsing https://falacom.com.br/tv-monitor/painel/ — verify only what our app emits."
+}

@@ -195,46 +195,91 @@ class HeartbeatOut(BaseModel):
     status_code: int
     response_snippet: Optional[str] = None
     error: Optional[str] = None
+    # Diagnostic fields returned to the app so the user can inspect exactly what was sent
+    method: str = "GET"
+    request_url: Optional[str] = None
+    codigo_sent: Optional[str] = None
+    codigo_raw_length: Optional[int] = None
+    codigo_clean_length: Optional[int] = None
 
 
 @api_router.post("/monitor/heartbeat", response_model=HeartbeatOut)
 async def proxy_heartbeat(body: HeartbeatIn):
-    """Forwards the heartbeat to the URL configured on the device. Existing to
-    bypass browser CORS in the preview and to give the app one uniform code path
-    on web and native.
+    """Forwards the heartbeat to the URL configured on the device via a plain
+    GET with `?codigo=<tv_code>` — that is exactly what the falacom.com.br
+    heartbeat endpoint expects (validated by the user in the browser).
+    Existing to bypass browser CORS in the preview and to give the app one
+    uniform code path on web and native.
     """
     server_url = (body.server_url or "").strip()
     if not re.match(r"^https?://", server_url):
         raise HTTPException(status_code=400, detail="URL do servidor de monitoramento inválida.")
-    payload = {
-        "tv_code": body.tv_code.strip(),
-        "status": body.status or "online",
-        "timestamp": body.timestamp or utc_now_iso(),
-        "app_version": body.app_version or "unknown",
-    }
+    # Aggressive normalization so hidden spaces / zero-width chars pasted from
+    # docs never reach the database as a different key. Also strips any control
+    # character (0x00-0x1F, 0x7F) and BOM/zero-width spaces.
+    raw = body.tv_code or ""
+    codigo = re.sub(r"[\s\u200B-\u200D\uFEFF\x00-\x1F\x7F]+", "", raw)
+
+    # Build the final GET URL, preserving any query string the user already put
+    # in the configured URL (won't override its `codigo`).
+    from urllib.parse import urlencode, urlparse, urlunparse, parse_qsl
+    parsed = urlparse(server_url)
+    query_pairs = [(k, v) for (k, v) in parse_qsl(parsed.query, keep_blank_values=True) if k != "codigo"]
+    query_pairs.append(("codigo", codigo))
+    request_url = urlunparse(parsed._replace(query=urlencode(query_pairs)))
+
+    logger.info(
+        "heartbeat proxy — method=GET url=%s codigo=%r raw_len=%d clean_len=%d",
+        request_url, codigo, len(raw), len(codigo),
+    )
+
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as http:
-            resp = await http.post(
-                server_url,
-                json=payload,
+            resp = await http.get(
+                request_url,
                 headers={
-                    "Accept": "application/json",
-                    # Custom UA: many shared hosts (Mod_Security) block the generic
-                    # Chrome UA on POSTs. This UA is uniquely ours and consistently accepted.
+                    "Accept": "*/*",
+                    # Custom UA: shared hosts (Mod_Security) block the generic Chrome UA.
                     "User-Agent": f"TVIndoorPlayer/{body.app_version or '1.0.0'}",
                 },
             )
-        snippet = (resp.text or "")[:200]
+        snippet = (resp.text or "")[:400]
+        logger.info("heartbeat proxy — response status=%s body=%r", resp.status_code, snippet)
         return HeartbeatOut(
             ok=resp.is_success,
             status_code=resp.status_code,
             response_snippet=snippet,
             error=None if resp.is_success else f"Servidor respondeu HTTP {resp.status_code}",
+            method="GET",
+            request_url=request_url,
+            codigo_sent=codigo,
+            codigo_raw_length=len(raw),
+            codigo_clean_length=len(codigo),
         )
     except httpx.TimeoutException:
-        return HeartbeatOut(ok=False, status_code=0, response_snippet=None, error="Tempo esgotado ao contatar o servidor de monitoramento.")
+        return HeartbeatOut(
+            ok=False,
+            status_code=0,
+            response_snippet=None,
+            error="Tempo esgotado ao contatar o servidor de monitoramento.",
+            method="GET",
+            request_url=request_url,
+            codigo_sent=codigo,
+            codigo_raw_length=len(raw),
+            codigo_clean_length=len(codigo),
+        )
     except Exception as exc:
-        return HeartbeatOut(ok=False, status_code=0, response_snippet=None, error=f"Falha ao enviar heartbeat: {exc}")
+        return HeartbeatOut(
+            ok=False,
+            status_code=0,
+            response_snippet=None,
+            error=f"Falha ao enviar heartbeat: {exc}",
+            method="GET",
+            request_url=request_url,
+            codigo_sent=codigo,
+            codigo_raw_length=len(raw),
+            codigo_clean_length=len(codigo),
+        )
 
 
 @api_router.get("/drive/stream")
