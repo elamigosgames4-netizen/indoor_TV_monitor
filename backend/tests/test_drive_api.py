@@ -37,3 +37,12 @@ def test_invalid_link_returns_portuguese_detail():
     assert response.status_code >= 400
     assert response.json()["detail"]
     assert any(word in response.json()["detail"].lower() for word in ("link", "pasta", "drive"))
+
+
+def test_empty_link_returns_400_portuguese():
+    response = requests.get(f"{BASE_URL}/api/drive/resolve", params={"link": ""}, timeout=30)
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    # Portuguese error, and NOT a MONGO_URL environment error
+    assert "MONGO" not in detail.upper()
+    assert any(word in detail.lower() for word in ("link", "pasta", "informe"))
