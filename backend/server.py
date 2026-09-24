@@ -1,8 +1,9 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime, timezone
 from html import unescape
@@ -179,6 +180,95 @@ async def resolve_drive_folder(link: str = Query(..., description="Link tiny.cc 
         upsert=True,
     )
     return ResolveResponse(**data)
+
+
+class HeartbeatIn(BaseModel):
+    server_url: str = Field(..., description="URL do servidor de monitoramento configurado no aparelho")
+    tv_code: str
+    status: str = "online"
+    timestamp: Optional[str] = None
+    app_version: Optional[str] = None
+
+
+class HeartbeatOut(BaseModel):
+    ok: bool
+    status_code: int
+    response_snippet: Optional[str] = None
+    error: Optional[str] = None
+
+
+@api_router.post("/monitor/heartbeat", response_model=HeartbeatOut)
+async def proxy_heartbeat(body: HeartbeatIn):
+    """Forwards the heartbeat to the URL configured on the device. Existing to
+    bypass browser CORS in the preview and to give the app one uniform code path
+    on web and native.
+    """
+    server_url = (body.server_url or "").strip()
+    if not re.match(r"^https?://", server_url):
+        raise HTTPException(status_code=400, detail="URL do servidor de monitoramento inválida.")
+    payload = {
+        "tv_code": body.tv_code.strip(),
+        "status": body.status or "online",
+        "timestamp": body.timestamp or utc_now_iso(),
+        "app_version": body.app_version or "unknown",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as http:
+            resp = await http.post(
+                server_url,
+                json=payload,
+                headers={
+                    "Accept": "application/json",
+                    # Custom UA: many shared hosts (Mod_Security) block the generic
+                    # Chrome UA on POSTs. This UA is uniquely ours and consistently accepted.
+                    "User-Agent": f"TVIndoorPlayer/{body.app_version or '1.0.0'}",
+                },
+            )
+        snippet = (resp.text or "")[:200]
+        return HeartbeatOut(
+            ok=resp.is_success,
+            status_code=resp.status_code,
+            response_snippet=snippet,
+            error=None if resp.is_success else f"Servidor respondeu HTTP {resp.status_code}",
+        )
+    except httpx.TimeoutException:
+        return HeartbeatOut(ok=False, status_code=0, response_snippet=None, error="Tempo esgotado ao contatar o servidor de monitoramento.")
+    except Exception as exc:
+        return HeartbeatOut(ok=False, status_code=0, response_snippet=None, error=f"Falha ao enviar heartbeat: {exc}")
+
+
+@api_router.get("/drive/stream")
+async def stream_drive_file(id: str = Query(..., description="Google Drive file id")):
+    """Streams a public Drive file through the backend so the web preview (and any
+    device that struggles with the redirect chain) can render it without hitting
+    Google's HTML confirmation page or CORS.
+    """
+    file_id = id.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,}", file_id):
+        raise HTTPException(status_code=400, detail="Id de arquivo do Drive inválido.")
+    url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
+    client_http = httpx.AsyncClient(timeout=None, follow_redirects=True, headers={"User-Agent": USER_AGENT})
+    try:
+        req = client_http.build_request("GET", url)
+        resp = await client_http.send(req, stream=True)
+    except Exception as exc:
+        await client_http.aclose()
+        raise HTTPException(status_code=502, detail=f"Falha ao contatar Google Drive: {exc}")
+    if resp.status_code >= 400:
+        await resp.aclose()
+        await client_http.aclose()
+        raise HTTPException(status_code=resp.status_code, detail="Google Drive retornou erro para este arquivo.")
+    media_type = resp.headers.get("content-type", "application/octet-stream")
+
+    async def iterator():
+        try:
+            async for chunk in resp.aiter_bytes(65536):
+                yield chunk
+        finally:
+            await resp.aclose()
+            await client_http.aclose()
+
+    return StreamingResponse(iterator(), media_type=media_type)
 
 
 app.include_router(api_router)

@@ -4,7 +4,8 @@ import { AppState, type AppStateStatus } from "react-native";
 import { loadSettings, saveMonitoringStatus } from "./settings";
 import type { AppSettings, MonitoringStatus } from "./types";
 
-const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
@@ -38,16 +39,28 @@ export async function sendHeartbeat(settings: AppSettings): Promise<MonitoringSt
     };
   }
 
+  if (!BASE) {
+    return {
+      configured: true,
+      lastHeartbeatAt: new Date().toISOString(),
+      lastHeartbeatOk: false,
+      lastHeartbeatError: "EXPO_PUBLIC_BACKEND_URL não configurada.",
+    };
+  }
+
   heartbeatInFlight = true;
   const timestamp = new Date().toISOString();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(settings.monitorServerUrl.trim(), {
+    // Heartbeat goes through the backend proxy so it works identically on the
+    // web preview (browser CORS) and on native devices.
+    const response = await fetch(`${BASE}/api/monitor/heartbeat`, {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({
+        server_url: settings.monitorServerUrl.trim(),
         tv_code: settings.monitorTvCode.trim(),
         status: "online",
         timestamp,
@@ -55,7 +68,18 @@ export async function sendHeartbeat(settings: AppSettings): Promise<MonitoringSt
       }),
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error(`Servidor respondeu HTTP ${response.status}.`);
+    let body: { ok?: boolean; error?: string; status_code?: number } | null = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    if (!response.ok) {
+      throw new Error(body?.error ?? `Servidor respondeu HTTP ${response.status}.`);
+    }
+    if (body?.ok === false) {
+      throw new Error(body.error ?? `Servidor de monitoramento respondeu HTTP ${body.status_code ?? "?"}.`);
+    }
     const status: MonitoringStatus = {
       configured: true,
       lastHeartbeatAt: timestamp,

@@ -3,7 +3,15 @@ import { Directory, File, Paths } from "expo-file-system";
 
 import type { PlaylistItem } from "./types";
 
+const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL;
+
 export function driveDownloadUrl(fileId: string): string {
+  // Web browsers can't follow Google Drive's HTML confirm/redirect chain
+  // (blank/black video tag). Route through the backend so <video>/<Image>
+  // receive a straight binary stream with proper Content-Type.
+  if (Platform.OS === "web" && BACKEND) {
+    return `${BACKEND}/api/drive/stream?id=${encodeURIComponent(fileId)}`;
+  }
   // Direct download of a public Drive file, no API key, works for large videos
   return `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
 }

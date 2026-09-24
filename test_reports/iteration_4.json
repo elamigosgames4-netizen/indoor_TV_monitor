@@ -1,0 +1,24 @@
+{
+  "summary": "Both reported bugs are fully fixed and independently verified. BUG 1 (Heartbeat 'Enviar teste agora'): 8/8 backend tests pass — the new POST /api/monitor/heartbeat proxy returns {ok:true,status_code:200} for the real falacom.com.br URL, returns 400 with Portuguese 'URL do servidor de monitoramento inválida.' for a malformed URL, and returns 200 with {ok:false,status_code:500} for a reachable non-2xx upstream (httpbin.org/status/500). On the mobile web preview (390x844), clicking settings-monitor-test-button turns the status pill 'Online', shows settings-message 'Heartbeat enviado com sucesso — versão 1.0.0.', and populates Último envio, with no error. BUG 2 (Player black screen): the new GET /api/drive/stream?id=<id> streams the correct image/jpeg content and returns 400 in Portuguese for INVALID / 4xx for well-formed-but-nonexistent ids. End-to-end: entering http://tiny.cc/03fc in settings-link-input and pressing settings-save-play-button navigates to '/' and within ~10s renders an <img> with src=/api/drive/stream?id=1QO0PvkhodrzMw... and naturalWidth=1024 (real photo visible, not black). Regression endpoints /api/health and /api/drive/resolve for tiny.cc/03fc pass. Monitoramento defaults, attribution, testIDs all match spec.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [], "react_native_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_bugs_iteration4.py",
+    "/app/test_reports/pytest/iteration4_results.xml",
+    "/app/test_reports/ui/it4_heartbeat.jpeg",
+    "/app/test_reports/ui/it4_player.jpeg",
+    "/app/test_reports/iteration_4.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: /api/monitor/heartbeat treats resp.is_success as the sole success signal. The falacom endpoint sometimes returns a 200 with body 'SEM CODIGO' when tv_code is unknown — the app will still report success. Consider parsing the response body for a domain-level success flag if the upstream contract evolves.",
+    "media.ts: driveDownloadUrl silently falls back to the direct Drive URL if EXPO_PUBLIC_BACKEND_URL is missing on web. That would recreate the black-screen bug — worth logging a warning at startup if BACKEND is unset on web."
+  ],
+  "updated_files": ["/app/backend/tests/test_bugs_iteration4.py", "/app/test_reports/iteration_4.json"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% for both reported flows (heartbeat send + player rendering after save)"},
+  "seed_data_creation": "None — used the pre-existing public folder http://tiny.cc/03fc and known file id 1QO0PvkhodrzMw_8l_g_Lcx2ekRvHP3NX.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend proxy endpoints POST /api/monitor/heartbeat and GET /api/drive/stream are live. Regression test file: /app/backend/tests/test_bugs_iteration4.py (needs EXPO_BACKEND_URL env when running from CLI, sourced from frontend/.env EXPO_PUBLIC_BACKEND_URL). Mobile viewport 390x844. Settings testIDs are hyphen-form (settings-monitor-tv-code-input NOT tvcode). Preview URL is web (Platform.OS==='web') so driveDownloadUrl always returns the backend proxy URL there.",
+  "rca_of_issue": "BUG 1 root cause: falacom.com.br is on shared hosting whose WAF (Mod_Security) returns HTTP 406 for generic Chrome UA, and the browser could not POST directly due to CORS. Fix (already in place): POST /api/monitor/heartbeat backend proxy forwards using a custom UA 'TVIndoorPlayer/<version>'; frontend calls the proxy. BUG 2 root cause: expo-image/<img>/<video> cannot follow Google Drive's HTML confirmation/redirect chain on web, producing a black frame. Fix (already in place): GET /api/drive/stream?id=<id> streams the file with the correct Content-Type; driveDownloadUrl returns the proxy URL only on Platform.OS==='web', keeping native behavior unchanged. Both fixes reproduce green and independent tests pass."
+}
