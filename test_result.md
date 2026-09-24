@@ -181,3 +181,9 @@
 ## agent_communication:
 ##     -agent: "main"
 ##     -message: "Initial implementation complete. Self-test passed for preview loading, Monitoramento UI, default values, save and persistence. Please test heartbeat requests, validation, regression of player/settings, and report all issues. No credentials required."
+
+## test_iteration_2:
+##   testing_agent_summary: "Frontend monitoring flow passed, including intercepted POST payload, success/error states, defaults, validation, save without playlist, and return to player. TypeScript passed."
+##   fixed_after_report: "URL validation now uses URL parsing and requires http/https plus a hostname, including the Salvar e reproduzir path."
+##   unresolved_environment_issue: "Existing backend supervisor cannot start because the uploaded/current workspace has no backend MONGO_URL/DB_NAME environment configuration; /api/health and /api/drive/resolve remain unavailable in this environment. No backend file was changed for the monitoring feature."
+##   agent_changed_files: []

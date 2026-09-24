@@ -9,13 +9,14 @@ Aplicativo existente de mídia indoor para Android, usado em TV Weyon, outras TV
 - **Banco:** MongoDB (cache de resolução; futuramente batimentos dos aparelhos na Etapa 2).
 - **Autostart nativo:** config plugin `plugins/withAutostart.js` (BootReceiver Kotlin + RECEIVE_BOOT_COMPLETED/WAKE_LOCK + LEANBACK_LAUNCHER; dispara deep link `indoorplayer://boot`). O player inicializa o monitor globalmente assim que o app abre no boot.
 
-## Monitoramento — implementação (23/09/2026)
+## Monitoramento — implementação (24/09/2026)
 - A tela existente de configurações ganhou uma seção **Monitoramento**, sem nova tela nem alteração do fluxo do player.
 - Código da TV começa vazio; URL inicial é `https://falacom.com.br/tv-monitor/api/heartbeat.php`; intervalo inicial é 20 segundos e aceita 5–3600 segundos.
 - Configuração e último resultado do heartbeat ficam salvos localmente no aparelho.
 - Payload POST JSON: `tv_code`, `status: "online"`, `timestamp` ISO-8601 e `app_version`.
 - O serviço é iniciado no layout global, não depende da tela de monitoramento e é reiniciado após salvar novas configurações. O BootReceiver existente abre o app automaticamente junto com a TV.
-- Crédito exibido na tela: **feito por Tiago Rodrigues 64 9 84468273**.
+- Crédito exibido na tela: **FEITO por Tiago Rodrigues 64 9 84468273**.
+- Botão "Enviar teste agora" ao lado de "Salvar monitoramento" para disparar um heartbeat manual e ver sucesso/erro imediatamente.
 
 ## Ajustes (22/09/2026 — parte 3)
 - **Intervalo de verificação configurável em minutos:** novo campo "Verificar novos arquivos a cada (minutos)" (`syncIntervalMin`, padrão 1, faixa 1–1440). O timer de sincronização do player usa esse valor no lugar do fixo de 60s.

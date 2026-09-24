@@ -30,6 +30,15 @@ const ROTATIONS: { value: Rotation; label: string; id: string }[] = [
 
 type Message = { kind: "success" | "error"; text: string };
 
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value.trim());
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && Boolean(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -103,13 +112,19 @@ export default function SettingsScreen() {
       setBusy(null);
       return;
     }
+    const monitorServerUrl = form.monitorServerUrl.trim() || defaultSettings.monitorServerUrl;
+    if (!isValidHttpUrl(monitorServerUrl)) {
+      setMessage({ kind: "error", text: "URL de monitoramento inválida: use uma URL http:// ou https:// completa." });
+      setBusy(null);
+      return;
+    }
     const s: AppSettings = {
       ...form,
       folderLink: link,
       photoDurationSec: duration,
       syncIntervalMin: interval,
       monitorTvCode: form.monitorTvCode.trim(),
-      monitorServerUrl: form.monitorServerUrl.trim() || defaultSettings.monitorServerUrl,
+      monitorServerUrl,
       monitorIntervalSec: monitorInterval,
     };
     await saveSettings(s);
@@ -141,7 +156,7 @@ export default function SettingsScreen() {
     setMessage(null);
     const monitorInterval = Number.parseInt(monitorIntervalText, 10);
     const serverUrl = form.monitorServerUrl.trim();
-    if (!serverUrl || !/^https?:\/\//i.test(serverUrl)) {
+    if (!isValidHttpUrl(serverUrl)) {
       setMessage({ kind: "error", text: "Informe uma URL de monitoramento válida, começando com http:// ou https://." });
       return;
     }
@@ -175,7 +190,7 @@ export default function SettingsScreen() {
       setMessage({ kind: "error", text: "Informe o código da TV antes de testar o heartbeat." });
       return;
     }
-    if (!serverUrl || !/^https?:\/\//i.test(serverUrl)) {
+    if (!isValidHttpUrl(serverUrl)) {
       setMessage({ kind: "error", text: "Informe uma URL de monitoramento válida antes de testar." });
       return;
     }
@@ -522,7 +537,9 @@ export default function SettingsScreen() {
           </View>
         )}
       </View>
-      <Text style={styles.attribution}>feito por Tiago Rodrigues 64 9 84468273</Text>
+      <Text testID="settings-attribution" style={styles.attribution}>
+        FEITO por Tiago Rodrigues 64 9 84468273
+      </Text>
     </KeyboardAwareScrollView>
   );
 }
